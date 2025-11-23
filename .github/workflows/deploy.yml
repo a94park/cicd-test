@@ -8,7 +8,7 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest # GitHub-hosted runner for the build steps
-
+    environment: ssh
     steps:
       - name: Checkout code
         uses: actions/checkout@v2 # Action to check out your repository
@@ -39,6 +39,7 @@ jobs:
         with:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
+          port: ${{ secrets.REMOTE_PORT }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
             # Commands to run on your Ubuntu server after deployment
