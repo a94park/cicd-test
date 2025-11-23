@@ -3,6 +3,7 @@ function App() {
     <>
       <p>hello world - cicd</p>
       <p>attempt 1</p>
+      <p>attempt 2</p>
     </>
   );
 }
