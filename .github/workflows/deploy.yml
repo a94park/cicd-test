@@ -15,14 +15,14 @@ jobs:
 
       # Add steps here to install dependencies, build, and test your application
       # Example for a Node.js app:
-      # - name: Use Node.js
-      #   uses: actions/setup-node@v2
-      #   with:
-      #     node-version: '14.x'
-      # - name: Install dependencies
-      #   run: npm install
-      # - name: Build project
-      #   run: npm run build
+      - name: Use Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: "14.x"
+      - name: Install dependencies
+        run: npm install
+      - name: Build project
+        run: npm run build
 
       - name: Deploy to Ubuntu Server
         uses: easingthemes/ssh-deploy@v2.1.4 # Action to deploy via SSH
@@ -31,7 +31,7 @@ jobs:
           REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
           REMOTE_USER: ${{ secrets.REMOTE_USER }}
           REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
-          SOURCE: "." # Source directory to copy from runner (e.g., "build/")
+          SOURCE: "dist/" # Source directory to copy from runner (e.g., "build/")
           TARGET: "~/" # Destination directory on your server
 
       - name: Run post-deployment commands
