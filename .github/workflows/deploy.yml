@@ -1,50 +1,59 @@
-name: CI/CD Pipeline to Ubuntu Server
+name: Deploy to Ubuntu Server with Cloudflare
 
 on:
   push:
     branches:
-      - main # Trigger on push to the main branch
+      - main
 
 jobs:
-  build-and-deploy:
-    runs-on: ubuntu-latest # GitHub-hosted runner for the build steps
-    environment: ssh
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v2 # Action to check out your repository
+  deploy:
+    runs-on: ubuntu-latest
 
-      # Add steps here to install dependencies, build, and test your application
-      # Example for a Node.js app:
-      - name: Use Node.js
-        uses: actions/setup-node@v2
-        with:
-          node-version: "14.x"
-      - name: Install dependencies
-        run: npm install
-      - name: Build project
-        run: npm run build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # (Optional) Add steps here to build your application (e.g., npm install, npm run build)
+
+      - name: Prepare SSH key (base64 secret)
+        id: prepare-ssh
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          # Decode base64-encoded private key from secret into a file
+          echo "$SSH_PRIVATE_KEY_B64" | base64 -d > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Try converting to PEM for broader compatibility (non-fatal)
+          ssh-keygen -p -N "" -m PEM -f ~/.ssh/deploy_key || true
+          # Add host to known_hosts to avoid interactive prompt (uses SSH_HOST and SSH_PORT)
+          if [ -n "${SSH_HOST:-}" ]; then
+            ssh-keyscan -p "${SSH_PORT:-22}" -H "$SSH_HOST" >> ~/.ssh/known_hosts || true
+          fi
+          # Export the decoded key content to GITHUB_ENV so subsequent actions can use it
+          echo "DECODED_SSH_KEY<<EOF" >> $GITHUB_ENV
+          cat ~/.ssh/deploy_key >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+        env:
+          SSH_PRIVATE_KEY_B64: ${{ secrets.SSH_PRIVATE_KEY_B64 }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
 
       - name: Deploy to Ubuntu Server
-        uses: easingthemes/ssh-deploy@v2.1.4 # Action to deploy via SSH
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-          REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          REMOTE_PORT: ${{ secrets.REMOTE_PORT }}
-          SOURCE: "dist/" # Source directory to copy from runner (e.g., "build/")
-          TARGET: "~/" # Destination directory on your server
-
-      - name: Run post-deployment commands
-        uses: appleboy/ssh-action@v0.1.3
+        uses: appleboy/scp-action@v0.1.4
         with:
-          host: ${{ secrets.REMOTE_HOST }}
-          username: ${{ secrets.REMOTE_USER }}
-          port: ${{ secrets.REMOTE_PORT }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: parkabraham.com # e.g., 192.168.1.100 or a domain name pointing to your tunnel
+          username: ${{ secrets.SSH_USER }} # The username for the deployment user on your Ubuntu server
+          key: ${{ env.DECODED_SSH_KEY }}
+          source: "." # The source files/folder to upload
+          target: "~" # The destination on your Ubuntu server
+
+      - name: Restart application service (if needed)
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: your_server_ssh_address
+          username: your_ssh_username
+          key: ${{ env.DECODED_SSH_KEY }}
           script: |
-            # Commands to run on your Ubuntu server after deployment
-            cd /var/www/your-app
-            # Example: stop old process, install dependencies, start new process
-            # pm2 stop app || true
-            # npm install
-            # pm2 start app
+            # Commands to restart your application (e.g., restart an Nginx service or Docker container)
+            # Example: sudo systemctl restart nginx
+            # Example: docker restart my-app-container
